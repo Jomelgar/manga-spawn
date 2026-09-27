@@ -32,6 +32,10 @@ yarn-error.*
 
 # local env files
 .env*.local
+.env
+
+# optional expo-go patch (applied on demand)
+/patches/
 
 # typescript
 *.tsbuildinfo

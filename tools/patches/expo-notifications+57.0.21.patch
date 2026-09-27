@@ -1,0 +1,21 @@
+diff --git a/node_modules/expo-notifications/build/DevicePushTokenAutoRegistration.fx.js b/node_modules/expo-notifications/build/DevicePushTokenAutoRegistration.fx.js
+index 85cd97c..b7edb61 100644
+--- a/node_modules/expo-notifications/build/DevicePushTokenAutoRegistration.fx.js
++++ b/node_modules/expo-notifications/build/DevicePushTokenAutoRegistration.fx.js
+@@ -1,5 +1,6 @@
+ import 'abort-controller/polyfill';
+-import { UnavailabilityError } from 'expo-modules-core';
++import { UnavailabilityError, Platform } from 'expo-modules-core';
++import { isRunningInExpoGo } from 'expo';
+ import ServerRegistrationModule from './ServerRegistrationModule';
+ import { addPushTokenListener } from './TokenEmitter';
+ import { getDevicePushTokenAsync } from './getDevicePushTokenAsync';
+@@ -72,7 +73,7 @@ export async function __handlePersistedRegistrationInfoAsync(registrationInfo) {
+         console.warn('[expo-notifications] Error encountered while updating server registration with latest device push token.', e);
+     }
+ }
+-if (ServerRegistrationModule.getRegistrationInfoAsync) {
++if (!(isRunningInExpoGo() && Platform.OS === 'android') && ServerRegistrationModule.getRegistrationInfoAsync) {
+     // A global scope (to get all the updates) device push token
+     // subscription, never cleared.
+     addPushTokenListener(async (token) => {
