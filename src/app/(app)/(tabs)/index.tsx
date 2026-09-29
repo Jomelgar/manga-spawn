@@ -1,74 +1,55 @@
-import { Image } from 'expo-image';
-import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
+import type { ContentKind } from '@manga-spawn/content-sources';
+
+import { ContinueReading } from '@/components/continue-reading';
+import { LogoMark } from '@/components/logo';
 import { MangaGrid } from '@/components/manga-grid';
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Button } from '@/components/ui/button';
 import { Loading } from '@/components/ui/loading';
 import { Segmented } from '@/components/ui/segmented';
 import { Spacing } from '@/constants/theme';
 import { useSession } from '@/core/auth/session-provider';
 import { flattenPages } from '@/core/utils/pages';
-import { useLastRead } from '@/features/library/use-library';
+import { useInProgress } from '@/features/library/use-library';
 import { useLatestManga, usePopularManga } from '@/features/manga/use-manga';
-import { useTheme } from '@/hooks/use-theme';
 
 type Feed = 'popular' | 'latest';
 
+const KIND_OPTIONS: { value: ContentKind; label: string }[] = [
+  { value: 'manga', label: 'Mangas' },
+  { value: 'book', label: 'Libros' },
+  { value: 'comic', label: 'Comics' },
+];
+
 export default function HomeScreen() {
   const { session } = useSession();
-  const theme = useTheme();
   const [feed, setFeed] = useState<Feed>('popular');
-  const { data: lastRead } = useLastRead();
-  const popular = usePopularManga(feed === 'popular');
-  const latest = useLatestManga(feed === 'latest');
+  const [kind, setKind] = useState<ContentKind>('manga');
+  const { data: inProgress } = useInProgress();
+  const popular = usePopularManga(kind, feed === 'popular');
+  const latest = useLatestManga(kind, feed === 'latest');
 
   const active = feed === 'popular' ? popular : latest;
   const manga = useMemo(() => flattenPages(active.data), [active.data]);
 
   const header = (
     <View style={styles.header}>
-      <View>
-        <ThemedText type="subtitle">Hola, {session?.username}</ThemedText>
-        <ThemedText type="small" themeColor="textSecondary">
-          ¿Qué leerás hoy?
-        </ThemedText>
+      <View style={styles.greeting}>
+        <LogoMark size={40} />
+        <View style={styles.greetingText}>
+          <ThemedText type="subtitle">Hola, {session?.username}</ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">
+            ¿Qué leerás hoy?
+          </ThemedText>
+        </View>
       </View>
 
-      {lastRead ? (
-        <Pressable
-          onPress={() =>
-            router.push({
-              pathname: '/chapter/[id]',
-              params: { id: lastRead.chapterId, mangaId: lastRead.mangaId },
-            })
-          }>
-          <ThemedView type="backgroundElement" style={styles.continueCard}>
-            {lastRead.coverUrl ? (
-              <Image source={{ uri: lastRead.coverUrl }} style={styles.continueCover} />
-            ) : (
-              <View style={[styles.continueCover, { backgroundColor: theme.backgroundSelected }]} />
-            )}
-            <View style={styles.continueInfo}>
-              <ThemedText type="small" themeColor="textSecondary">
-                Continuar leyendo
-              </ThemedText>
-              <ThemedText type="smallBold" numberOfLines={1}>
-                {lastRead.mangaTitle}
-              </ThemedText>
-              <ThemedText type="small" themeColor="textSecondary">
-                {lastRead.chapterNumber ? `Cap. ${lastRead.chapterNumber} · ` : ''}
-                página {lastRead.page + 1}
-              </ThemedText>
-            </View>
-            <Button title="Seguir" variant="ghost" />
-          </ThemedView>
-        </Pressable>
-      ) : null}
+      <ContinueReading items={inProgress ?? []} />
+
+      <Segmented value={kind} onChange={setKind} options={KIND_OPTIONS} />
 
       <Segmented
         value={feed}
@@ -116,6 +97,15 @@ const styles = StyleSheet.create({
   header: {
     gap: Spacing.four,
     paddingBottom: Spacing.two,
+  },
+  greeting: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three,
+  },
+  greetingText: {
+    flex: 1,
+    gap: Spacing.half,
   },
   continueCard: {
     flexDirection: 'row',

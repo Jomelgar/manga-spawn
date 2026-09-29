@@ -1,5 +1,5 @@
-import { Chapter } from '@/domain/models/chapter';
-import { Manga } from '@/domain/models/manga';
+import type { Content, Release } from '../../models';
+import { decodeEntities, stripTags } from '../../text';
 
 const COVER_BASE = 'https://temp.compsci88.com/cover/fallback';
 
@@ -7,25 +7,8 @@ export function buildCoverUrl(seriesId: string): string {
   return `${COVER_BASE}/${seriesId}.jpg`;
 }
 
-function decodeEntities(value: string): string {
-  return value
-    .replace(/&amp;/g, '&')
-    .replace(/&#39;/g, "'")
-    .replace(/&#x27;/g, "'")
-    .replace(/&quot;/g, '"')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function stripTags(value: string): string {
-  return decodeEntities(value.replace(/<[^>]+>/g, ''));
-}
-
-export function parseSearch(html: string): Manga[] {
-  const results: Manga[] = [];
+export function parseSearch(html: string): Content[] {
+  const results: Content[] = [];
   const seen = new Set<string>();
   const pattern =
     /<a href="https:\/\/weebcentral\.com\/series\/([^/"]+)\/[^"]*"[^>]*data-tip="([^"]*)"/g;
@@ -35,15 +18,16 @@ export function parseSearch(html: string): Manga[] {
     const [, id, title] = match;
     if (seen.has(id)) continue;
     seen.add(id);
-    results.push(toManga(id, decodeEntities(title)));
+    results.push(toContent(id, decodeEntities(title)));
   }
 
   return results;
 }
 
-function toManga(id: string, title: string): Manga {
+function toContent(id: string, title: string): Content {
   return {
     id,
+    kind: 'manga',
     title,
     altTitles: [],
     description: '',
@@ -96,8 +80,8 @@ function parseChapterNumber(label: string): string | null {
   return match ? match[1] : null;
 }
 
-export function parseChapters(html: string, mangaId: string): Chapter[] {
-  const chapters: Chapter[] = [];
+export function parseReleases(html: string, mangaId: string): Release[] {
+  const releases: Release[] = [];
   const anchorPattern = /<a href="\/chapters\/([^"]+)"[^>]*>([\s\S]*?)<\/a>/g;
 
   let match: RegExpExecArray | null;
@@ -111,7 +95,7 @@ export function parseChapters(html: string, mangaId: string): Chapter[] {
       labels.find((value) => /\d/.test(value)) ??
       '';
 
-    chapters.push({
+    releases.push({
       id,
       mangaId,
       title: label || null,
@@ -125,7 +109,7 @@ export function parseChapters(html: string, mangaId: string): Chapter[] {
     });
   }
 
-  return chapters.reverse();
+  return releases.reverse();
 }
 
 export function parsePages(html: string): string[] {

@@ -1,4 +1,5 @@
-import { ApiError } from '../mangadex/http-client';
+import { ApiError } from '../../http';
+import { sleep } from '../../http';
 
 const BASE_URL = 'https://weebcentral.com';
 const USER_AGENT =
@@ -38,8 +39,4 @@ export class WeebCentralClient {
   get baseUrl(): string {
     return BASE_URL;
   }
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }

@@ -17,7 +17,9 @@ export class StorageLibraryRepository implements LibraryRepository {
   constructor(private readonly store: KeyValueStore = appStore) {}
 
   async listFollowed(): Promise<FollowedManga[]> {
-    return (await readJson<FollowedManga[]>(this.store, STORAGE_KEYS.followed)) ?? [];
+    const followed =
+      (await readJson<FollowedManga[]>(this.store, STORAGE_KEYS.followed)) ?? [];
+    return followed.map((item) => ({ ...item, kind: item.kind ?? 'manga' }));
   }
 
   async isFollowed(mangaId: string): Promise<boolean> {
@@ -27,8 +29,10 @@ export class StorageLibraryRepository implements LibraryRepository {
 
   follow(manga: {
     mangaId: string;
+    kind: FollowedManga['kind'];
     title: string;
     coverUrl: string | null;
+    coverHeaders?: Record<string, string>;
     lastKnownChapterId: string | null;
     lastKnownChapterNumber: string | null;
   }): Promise<void> {
@@ -80,12 +84,21 @@ export class StorageLibraryRepository implements LibraryRepository {
   async getLastRead(): Promise<ReadingProgress | null> {
     const state = await this.readProgress();
     if (!state.lastReadId) return null;
-    return state.byManga[state.lastReadId] ?? null;
+    const progress = state.byManga[state.lastReadId];
+    return progress ? { ...progress, kind: progress.kind ?? 'manga' } : null;
   }
 
   async getProgress(mangaId: string): Promise<ReadingProgress | null> {
     const state = await this.readProgress();
-    return state.byManga[mangaId] ?? null;
+    const progress = state.byManga[mangaId];
+    return progress ? { ...progress, kind: progress.kind ?? 'manga' } : null;
+  }
+
+  async listInProgress(): Promise<ReadingProgress[]> {
+    const state = await this.readProgress();
+    return Object.values(state.byManga)
+      .map((progress) => ({ ...progress, kind: progress.kind ?? 'manga' }))
+      .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
   }
 
   private readProgress(): Promise<ProgressState> {

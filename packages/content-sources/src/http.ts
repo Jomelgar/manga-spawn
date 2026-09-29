@@ -1,5 +1,3 @@
-import { USER_AGENT } from '@/core/config';
-
 export type QueryValue = string | number | boolean | string[] | undefined;
 
 export interface RequestOptions {
@@ -9,6 +7,8 @@ export interface RequestOptions {
 }
 
 export type TokenProvider = () => Promise<string | null>;
+
+export const DEFAULT_USER_AGENT = 'manga-spawn/1.0.0';
 
 export class ApiError extends Error {
   constructor(
@@ -23,12 +23,25 @@ export class ApiError extends Error {
 
 const MIN_REQUEST_INTERVAL_MS = 220;
 
+export interface HttpClientOptions {
+  userAgent?: string;
+  minIntervalMs?: number;
+}
+
 export class HttpClient {
   private tokenProvider: TokenProvider | null = null;
   private queue: Promise<unknown> = Promise.resolve();
   private lastRequestAt = 0;
+  private readonly userAgent: string;
+  private readonly minIntervalMs: number;
 
-  constructor(private readonly baseUrl: string) {}
+  constructor(
+    private readonly baseUrl: string,
+    options: HttpClientOptions = {},
+  ) {
+    this.userAgent = options.userAgent ?? DEFAULT_USER_AGENT;
+    this.minIntervalMs = options.minIntervalMs ?? MIN_REQUEST_INTERVAL_MS;
+  }
 
   setTokenProvider(provider: TokenProvider): void {
     this.tokenProvider = provider;
@@ -60,7 +73,7 @@ export class HttpClient {
     return this.enqueue(async () => {
       const headers: Record<string, string> = {
         Accept: 'application/json',
-        'User-Agent': USER_AGENT,
+        'User-Agent': this.userAgent,
         ...options.headers,
       };
 
@@ -112,7 +125,7 @@ export class HttpClient {
   private enqueue<T>(task: () => Promise<T>): Promise<T> {
     const run = this.queue.then(async () => {
       const now = Date.now();
-      const wait = Math.max(0, MIN_REQUEST_INTERVAL_MS - (now - this.lastRequestAt));
+      const wait = Math.max(0, this.minIntervalMs - (now - this.lastRequestAt));
       if (wait > 0) await sleep(wait);
       this.lastRequestAt = Date.now();
       return task();
@@ -122,7 +135,7 @@ export class HttpClient {
   }
 }
 
-function safeParse(text: string): any {
+export function safeParse(text: string): any {
   try {
     return JSON.parse(text);
   } catch {
@@ -130,6 +143,6 @@ function safeParse(text: string): any {
   }
 }
 
-function sleep(ms: number): Promise<void> {
+export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }

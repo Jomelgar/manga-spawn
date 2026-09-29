@@ -2,6 +2,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useColorScheme } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { SessionProvider, useSession } from '@/core/auth/session-provider';
 import { RepositoryProvider } from '@/core/di/provider';
@@ -18,17 +19,19 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
 
   return (
-    <RepositoryProvider>
-      <QueryClientProvider client={queryClient}>
-        <SessionProvider>
-          <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-            <SplashScreenController />
-            <NotificationObserver />
-            <RootNavigator />
-          </ThemeProvider>
-        </SessionProvider>
-      </QueryClientProvider>
-    </RepositoryProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <RepositoryProvider>
+        <QueryClientProvider client={queryClient}>
+          <SessionProvider>
+            <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+              <SplashScreenController />
+              <NotificationObserver />
+              <RootNavigator />
+            </ThemeProvider>
+          </SessionProvider>
+        </QueryClientProvider>
+      </RepositoryProvider>
+    </GestureHandlerRootView>
   );
 }
 

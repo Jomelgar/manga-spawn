@@ -1,121 +1,71 @@
-import { Chapter, ChapterPages } from '@/domain/models/chapter';
+import {
+  HttpClient,
+  MangaDexSource as SharedMangaDexSource,
+  type ReaderContent,
+} from '@manga-spawn/content-sources';
+
+import { MANGADEX_API_URL, MANGADEX_REPORT_URL, USER_AGENT } from '@/core/config';
+import { Chapter } from '@/domain/models/chapter';
 import { Manga, MangaSearchFilters, MangaTag, Page } from '@/domain/models/manga';
 import { SourceInfo } from '@/domain/models/settings';
 import { MangaSource } from '@/domain/providers/manga-source';
 import { SettingsRepository } from '@/domain/repositories/settings-repository';
 
-import { MangaDexChapterDatasource } from './chapter-datasource';
-import { MangaDexMangaDatasource } from './manga-datasource';
-import { mapChapter, mapManga, mapTag } from './mappers';
-
-const PAGE_QUALITY: 'data' | 'data-saver' = 'data-saver';
-
 export class MangaDexSource implements MangaSource {
-  readonly info: SourceInfo = {
-    id: 'mangadex',
-    name: 'MangaDex',
-    languages: ['es', 'es-la', 'en'],
-    description: 'Catálogo oficial con muchos idiomas.',
-  };
+  readonly info: SourceInfo;
+  private readonly delegate: SharedMangaDexSource;
 
   constructor(
-    private readonly mangaDatasource: MangaDexMangaDatasource,
-    private readonly chapterDatasource: MangaDexChapterDatasource,
-    private readonly settings: SettingsRepository,
-  ) {}
-
-  async search(filters: MangaSearchFilters, offset: number, limit: number): Promise<Page<Manga>> {
-    const response = await this.mangaDatasource.search(
-      filters,
-      offset,
-      limit,
-      await this.languages(),
-    );
-    return this.toPage(response.data, response.offset ?? offset, response.limit ?? limit, response.total);
+    settings: SettingsRepository,
+    http: HttpClient = new HttpClient(MANGADEX_API_URL, { userAgent: USER_AGENT }),
+  ) {
+    this.delegate = new SharedMangaDexSource(http, {
+      languages: async () => {
+        const language = await settings.getLanguage();
+        return language === 'all' ? [] : [language];
+      },
+      reportUrl: MANGADEX_REPORT_URL,
+    });
+    this.info = this.delegate.info;
   }
 
-  async getManga(rawId: string): Promise<Manga> {
-    const response = await this.mangaDatasource.getById(rawId);
-    return mapManga(response.data);
+  search(filters: MangaSearchFilters, offset: number, limit: number): Promise<Page<Manga>> {
+    return this.delegate.search(filters, offset, limit);
   }
 
-  async getTags(): Promise<MangaTag[]> {
-    const response = await this.mangaDatasource.getTags();
-    return response.data.map(mapTag);
+  getManga(rawId: string): Promise<Manga> {
+    return this.delegate.getContent(rawId);
   }
 
-  async getPopular(offset: number, limit: number): Promise<Page<Manga>> {
-    const response = await this.mangaDatasource.getPopular(offset, limit, await this.languages());
-    return this.toPage(response.data, response.offset ?? offset, response.limit ?? limit, response.total);
+  getTags(): Promise<MangaTag[]> {
+    return this.delegate.getTags();
   }
 
-  async getLatest(offset: number, limit: number): Promise<Page<Manga>> {
-    const response = await this.mangaDatasource.getLatest(offset, limit, await this.languages());
-    return this.toPage(response.data, response.offset ?? offset, response.limit ?? limit, response.total);
+  getPopular(offset: number, limit: number): Promise<Page<Manga>> {
+    return this.delegate.getPopular(offset, limit);
   }
 
-  async getChapters(rawMangaId: string): Promise<Chapter[]> {
-    const response = await this.chapterDatasource.feed(
-      rawMangaId,
-      await this.languages(),
-      'asc',
-      500,
-    );
-    return response.data.map(mapChapter).map((chapter) => ({ ...chapter, mangaId: rawMangaId }));
+  getLatest(offset: number, limit: number): Promise<Page<Manga>> {
+    return this.delegate.getLatest(offset, limit);
   }
 
-  async getLatestChapter(rawMangaId: string): Promise<Chapter | null> {
-    const response = await this.chapterDatasource.feed(
-      rawMangaId,
-      await this.languages(),
-      'desc',
-      1,
-    );
-    const [first] = response.data;
-    return first ? { ...mapChapter(first), mangaId: rawMangaId } : null;
+  getChapters(rawMangaId: string): Promise<Chapter[]> {
+    return this.delegate.getReleases(rawMangaId);
   }
 
-  async getChapter(rawChapterId: string): Promise<Chapter> {
-    const response = await this.chapterDatasource.getById(rawChapterId);
-    return mapChapter(response.data);
+  getLatestChapter(rawMangaId: string): Promise<Chapter | null> {
+    return this.delegate.getLatestRelease(rawMangaId);
   }
 
-  async getPages(rawChapterId: string): Promise<ChapterPages> {
-    const atHome = await this.chapterDatasource.getAtHome(rawChapterId);
-    const files = PAGE_QUALITY === 'data' ? atHome.chapter.data : atHome.chapter.dataSaver;
-    const folder = PAGE_QUALITY === 'data' ? 'data' : 'data-saver';
-    return {
-      chapterId: rawChapterId,
-      baseUrl: atHome.baseUrl,
-      hash: atHome.chapter.hash,
-      pages: files.map((fileName, index) => ({
-        index,
-        fileName,
-        url: `${atHome.baseUrl}/${folder}/${atHome.chapter.hash}/${fileName}`,
-      })),
-    };
+  getChapter(rawChapterId: string): Promise<Chapter> {
+    return this.delegate.getRelease(rawChapterId);
+  }
+
+  getReader(rawChapterId: string): Promise<ReaderContent> {
+    return this.delegate.getReader(rawChapterId);
   }
 
   reportPage(url: string, success: boolean, bytes: number, duration: number): Promise<void> {
-    return this.chapterDatasource.report(url, success, bytes, duration);
-  }
-
-  private async languages(): Promise<string[]> {
-    const language = await this.settings.getLanguage();
-    return language === 'all' ? [] : [language];
-  }
-
-  private toPage(
-    data: Parameters<typeof mapManga>[0][],
-    offset: number,
-    limit: number,
-    total?: number,
-  ): Page<Manga> {
-    return {
-      items: data.map(mapManga),
-      offset,
-      limit,
-      total: total ?? data.length,
-    };
+    return this.delegate.reportPage(url, success, bytes, duration);
   }
 }

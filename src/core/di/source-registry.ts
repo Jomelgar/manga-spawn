@@ -1,24 +1,30 @@
 import { MangaSource } from '@/domain/providers/manga-source';
+import { ContentKind } from '@/domain/models/settings';
 import { SettingsRepository } from '@/domain/repositories/settings-repository';
-import { DEFAULT_SOURCE_ID } from '@/domain/source-id';
+import { CONTENT_KINDS, DEFAULT_SOURCE_ID } from '@/domain/source-id';
 
 export class SourceRegistry {
   private readonly sources: Map<string, MangaSource>;
   private readonly readyPromise: Promise<void>;
-  private activeId: string;
+  private readonly activeByKind: Partial<Record<ContentKind, string>> = {};
 
   constructor(
     sources: MangaSource[],
     private readonly settings: SettingsRepository,
   ) {
     this.sources = new Map(sources.map((source) => [source.info.id, source]));
-    this.activeId = DEFAULT_SOURCE_ID;
-    this.readyPromise = settings
-      .getActiveSourceId()
-      .then((id) => {
-        if (this.sources.has(id)) this.activeId = id;
-      })
-      .catch(() => undefined);
+    this.readyPromise = this.loadActive();
+  }
+
+  private async loadActive(): Promise<void> {
+    await Promise.all(
+      CONTENT_KINDS.map(async (kind) => {
+        const id = await this.settings.getActiveSourceId(kind).catch(() => null);
+        if (id && this.sources.has(id)) {
+          this.activeByKind[kind] = id;
+        }
+      }),
+    );
   }
 
   ready(): Promise<void> {
@@ -29,21 +35,32 @@ export class SourceRegistry {
     return [...this.sources.values()];
   }
 
+  listByKind(kind: ContentKind): MangaSource[] {
+    return this.list().filter((source) => source.info.kind === kind);
+  }
+
   get(id: string): MangaSource | undefined {
     return this.sources.get(id);
   }
 
-  getActive(): MangaSource {
-    const active = this.sources.get(this.activeId);
+  getActive(kind: ContentKind = 'manga'): MangaSource {
+    const activeId = this.activeByKind[kind];
+    const active = activeId ? this.sources.get(activeId) : undefined;
     if (active) return active;
-    const [first] = this.sources.values();
-    if (!first) throw new Error('No hay fuentes registradas.');
-    return first;
+
+    const [firstOfKind] = this.listByKind(kind);
+    if (firstOfKind) return firstOfKind;
+
+    const [fallback] = this.sources.values();
+    if (!fallback) throw new Error('No hay fuentes registradas.');
+    return fallback;
   }
 
-  async setActive(id: string): Promise<void> {
+  async setActive(kind: ContentKind, id: string): Promise<void> {
     if (!this.sources.has(id)) throw new Error(`Fuente desconocida: ${id}`);
-    this.activeId = id;
-    await this.settings.setActiveSourceId(id);
+    this.activeByKind[kind] = id;
+    await this.settings.setActiveSourceId(kind, id);
   }
 }
+
+export { DEFAULT_SOURCE_ID };

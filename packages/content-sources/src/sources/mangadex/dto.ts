@@ -55,11 +55,6 @@ export interface MangaDto {
   relationships: MangaRelationshipDto[];
 }
 
-export interface CoverAttributesDto {
-  fileName: string;
-  volume: string | null;
-}
-
 export interface ChapterAttributesDto {
   title: string | null;
   volume: string | null;

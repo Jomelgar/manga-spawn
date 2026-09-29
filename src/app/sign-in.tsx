@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 
 import { Screen } from '@/components/screen';
+import { Brand } from '@/components/logo';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { TextField } from '@/components/ui/text-field';
@@ -36,7 +37,7 @@ export default function SignInScreen() {
         style={styles.flex}>
         <View style={styles.content}>
           <View style={styles.hero}>
-            <ThemedText type="title">manga-spawn</ThemedText>
+            <Brand size={72} />
             <ThemedText type="small" themeColor="textSecondary">
               Tu lector de manga con recordatorios de fin de semana.
             </ThemedText>

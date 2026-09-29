@@ -1,21 +1,15 @@
-import { LOCALE_FALLBACK } from '@/core/config';
-import { Chapter } from '@/domain/models/chapter';
-import {
-  ContentRating,
-  Manga,
-  MangaStatus,
-  MangaTag,
-  PublicationDemographic,
-} from '@/domain/models/manga';
+import type { Content, ContentTag, ContentRating, MangaStatus, PublicationDemographic, Release } from '../../models';
 
-import { ChapterDto, LocalizedString, MangaDto, TagDto } from './dto';
+import type { ChapterDto, LocalizedString, MangaDto, TagDto } from './dto';
+
+export const LOCALE_FALLBACK = 'en';
 
 function pickLocalized(value: LocalizedString | undefined, preferred = LOCALE_FALLBACK): string {
   if (!value) return '';
   return value[preferred] ?? Object.values(value)[0] ?? '';
 }
 
-export function mapTag(dto: TagDto): MangaTag {
+export function mapTag(dto: TagDto): ContentTag {
   return {
     id: dto.id,
     name: pickLocalized(dto.attributes.name),
@@ -23,7 +17,7 @@ export function mapTag(dto: TagDto): MangaTag {
   };
 }
 
-export function mapManga(dto: MangaDto): Manga {
+export function mapContent(dto: MangaDto): Content {
   const cover = dto.relationships.find((rel) => rel.type === 'cover_art');
   const fileName = cover?.attributes?.fileName as string | undefined;
 
@@ -39,6 +33,7 @@ export function mapManga(dto: MangaDto): Manga {
 
   return {
     id: dto.id,
+    kind: 'manga',
     title: pickLocalized(dto.attributes.title),
     altTitles: dto.attributes.altTitles.map((entry) => pickLocalized(entry)).filter(Boolean),
     description: pickLocalized(dto.attributes.description),
@@ -61,7 +56,7 @@ export function buildCoverUrl(mangaId: string, fileName: string, size: 256 | 512
   return `https://uploads.mangadex.org/covers/${mangaId}/${fileName}.${size}.jpg`;
 }
 
-export function mapChapter(dto: ChapterDto): Chapter {
+export function mapRelease(dto: ChapterDto): Release {
   const groups = dto.relationships
     .filter((rel) => rel.type === 'scanlation_group')
     .map((rel) => (rel.attributes?.name as string) ?? '')

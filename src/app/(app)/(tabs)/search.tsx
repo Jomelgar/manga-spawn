@@ -1,4 +1,5 @@
-import { useMemo } from 'react';
+import type { ContentKind } from '@manga-spawn/content-sources';
+import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { MangaGrid } from '@/components/manga-grid';
@@ -7,6 +8,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Loading } from '@/components/ui/loading';
+import { Segmented } from '@/components/ui/segmented';
 import { TextField } from '@/components/ui/text-field';
 import { TagChip } from '@/components/tag-chip';
 import { Spacing } from '@/constants/theme';
@@ -15,9 +17,16 @@ import { MangaSearchFilters } from '@/domain/models/manga';
 import { searchStore, useSearchState } from '@/features/manga/search-store';
 import { useMangaSearch, useMangaTags } from '@/features/manga/use-manga';
 
+const KIND_OPTIONS: { value: ContentKind; label: string }[] = [
+  { value: 'manga', label: 'Mangas' },
+  { value: 'book', label: 'Libros' },
+  { value: 'comic', label: 'Comics' },
+];
+
 export default function SearchScreen() {
   const { title, selectedTags, query } = useSearchState();
-  const { data: tags } = useMangaTags();
+  const [kind, setKind] = useState<ContentKind>('manga');
+  const { data: tags } = useMangaTags(kind);
 
   const filters = useMemo<MangaSearchFilters>(
     () => ({
@@ -30,7 +39,7 @@ export default function SearchScreen() {
   );
 
   const enabled = Boolean(query && (query.title || query.includedTags?.length));
-  const search = useMangaSearch(filters, enabled);
+  const search = useMangaSearch(filters, enabled, kind);
   const results = useMemo(() => flattenPages(search.data), [search.data]);
 
   const canSearch = Boolean(title.trim()) || selectedTags.length > 0;
@@ -38,6 +47,7 @@ export default function SearchScreen() {
   const header = (
     <View style={styles.header}>
       <ThemedText type="subtitle">Buscar</ThemedText>
+      <Segmented value={kind} onChange={setKind} options={KIND_OPTIONS} />
       <TextField
         label="Título"
         placeholder="Ej. One Piece"

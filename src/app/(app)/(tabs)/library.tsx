@@ -2,6 +2,7 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 
+import { ContinueReading } from '@/components/continue-reading';
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -10,21 +11,23 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Loading } from '@/components/ui/loading';
 import { Spacing } from '@/constants/theme';
 import { FollowedManga } from '@/domain/models/reading-progress';
-import { useFollowedManga } from '@/features/library/use-library';
+import { useFollowedManga, useInProgress } from '@/features/library/use-library';
 import { useCheckNewChapters } from '@/features/notifications/use-notifications';
 import { useTheme } from '@/hooks/use-theme';
 
 export default function LibraryScreen() {
   const theme = useTheme();
   const { data, isLoading, refetch, isRefetching } = useFollowedManga();
+  const { data: inProgress } = useInProgress();
   const check = useCheckNewChapters();
 
   const header = (
     <View style={styles.header}>
       <ThemedText type="subtitle">Biblioteca</ThemedText>
       <ThemedText type="small" themeColor="textSecondary">
-        Tus mangas seguidos y novedades.
+        Tus títulos seguidos y novedades.
       </ThemedText>
+      <ContinueReading items={inProgress ?? []} />
       <Button
         title="Buscar capítulos nuevos"
         variant="secondary"
@@ -84,7 +87,7 @@ function FollowedRow({ manga, accent }: { manga: FollowedManga; accent: string }
       style={({ pressed }) => pressed && styles.pressed}>
       <ThemedView type="backgroundElement" style={styles.row}>
         {manga.coverUrl ? (
-          <Image source={{ uri: manga.coverUrl }} style={styles.cover} />
+          <Image source={{ uri: manga.coverUrl, headers: manga.coverHeaders }} style={styles.cover} />
         ) : null}
         <View style={styles.info}>
           <ThemedText type="smallBold" numberOfLines={2}>

@@ -1,3 +1,5 @@
+import type { ContentKind } from '@manga-spawn/content-sources';
+
 import { Manga, MangaSearchFilters, MangaTag, Page } from '@/domain/models/manga';
 import { MangaRepository } from '@/domain/repositories/manga-repository';
 import { parseSourceId, withSource } from '@/domain/source-id';
@@ -15,8 +17,9 @@ export class RoutedMangaRepository implements MangaRepository {
     filters: MangaSearchFilters,
     offset: number,
     limit: number,
+    kind: ContentKind = 'manga',
   ): Promise<Page<Manga>> {
-    const source = await this.active();
+    const source = await this.active(kind);
     return this.prefixPage(source.info.id, await source.search(filters, offset, limit));
   }
 
@@ -26,28 +29,36 @@ export class RoutedMangaRepository implements MangaRepository {
     return prefixManga(source.info.id, await source.getManga(rawId));
   }
 
-  async getTags(): Promise<MangaTag[]> {
-    return (await this.active()).getTags();
+  async getTags(kind: ContentKind = 'manga'): Promise<MangaTag[]> {
+    return (await this.active(kind)).getTags();
   }
 
-  async getPopular(offset: number, limit: number): Promise<Page<Manga>> {
-    const source = await this.active();
+  async getPopular(
+    offset: number,
+    limit: number,
+    kind: ContentKind = 'manga',
+  ): Promise<Page<Manga>> {
+    const source = await this.active(kind);
     return this.prefixPage(source.info.id, await source.getPopular(offset, limit));
   }
 
-  async getLatest(offset: number, limit: number): Promise<Page<Manga>> {
-    const source = await this.active();
+  async getLatest(
+    offset: number,
+    limit: number,
+    kind: ContentKind = 'manga',
+  ): Promise<Page<Manga>> {
+    const source = await this.active(kind);
     return this.prefixPage(source.info.id, await source.getLatest(offset, limit));
   }
 
-  private async active() {
+  private async active(kind: ContentKind) {
     await this.registry.ready();
-    return this.registry.getActive();
+    return this.registry.getActive(kind);
   }
 
   private async resolve(sourceId: string) {
     await this.registry.ready();
-    return this.registry.get(sourceId) ?? this.registry.getActive();
+    return this.registry.get(sourceId) ?? this.registry.getActive('manga');
   }
 
   private prefixPage(sourceId: string, page: Page<Manga>): Page<Manga> {

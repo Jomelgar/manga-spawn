@@ -1,28 +1,13 @@
-export interface Chapter {
-  id: string;
-  mangaId: string;
-  title: string | null;
-  chapter: string | null;
-  volume: string | null;
-  language: string;
-  pages: number;
-  publishAt: string;
-  readableAt: string;
-  scanlationGroups: string[];
-}
-
-export interface ChapterPage {
-  index: number;
-  fileName: string;
-  url: string;
-  headers?: Record<string, string>;
-}
+export type {
+  Release as Chapter,
+  ContentPage as ChapterPage,
+} from '@manga-spawn/content-sources';
 
 export interface ChapterPages {
   chapterId: string;
   baseUrl: string;
   hash: string;
-  pages: ChapterPage[];
+  pages: import('@manga-spawn/content-sources').ContentPage[];
 }
 
 export interface ChapterFeedParams {

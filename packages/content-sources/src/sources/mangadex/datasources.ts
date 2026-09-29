@@ -1,7 +1,7 @@
-import { MangaSearchFilters } from '@/domain/models/manga';
+import type { ContentSearchFilters } from '../../models';
+import type { HttpClient, QueryValue } from '../../http';
 
-import { MangaDexResponse, MangaDto, TagDto } from './dto';
-import { HttpClient, QueryValue } from './http-client';
+import type { AtHomeDto, ChapterDto, MangaDexResponse, MangaDto, TagDto } from './dto';
 
 const RELATIONS = ['cover_art', 'author', 'artist'];
 
@@ -9,7 +9,7 @@ export class MangaDexMangaDatasource {
   constructor(private readonly http: HttpClient) {}
 
   search(
-    filters: MangaSearchFilters,
+    filters: ContentSearchFilters,
     offset: number,
     limit: number,
     languages: string[],
@@ -25,9 +25,7 @@ export class MangaDexMangaDatasource {
 
   getById(id: string): Promise<MangaDexResponse<MangaDto>> {
     return this.http.get<MangaDexResponse<MangaDto>>(`/manga/${id}`, {
-      params: {
-        'includes[]': RELATIONS,
-      },
+      params: { 'includes[]': RELATIONS },
     });
   }
 
@@ -62,8 +60,59 @@ export class MangaDexMangaDatasource {
   }
 }
 
+export class MangaDexChapterDatasource {
+  constructor(private readonly http: HttpClient) {}
+
+  feed(
+    mangaId: string,
+    languages: string[],
+    order: 'asc' | 'desc',
+    limit: number,
+  ): Promise<MangaDexResponse<ChapterDto[]>> {
+    const params: Record<string, QueryValue> = {
+      'includes[]': ['scanlation_group'],
+      'translatedLanguage[]': languages,
+      'order[chapter]': order,
+      limit,
+      contentRating: undefined,
+    };
+    return this.http.get<MangaDexResponse<ChapterDto[]>>(`/manga/${mangaId}/feed`, { params });
+  }
+
+  getById(id: string): Promise<MangaDexResponse<ChapterDto>> {
+    return this.http.get<MangaDexResponse<ChapterDto>>(`/chapter/${id}`, {
+      params: { 'includes[]': ['manga', 'scanlation_group'] },
+    });
+  }
+
+  getAtHome(chapterId: string): Promise<AtHomeDto> {
+    return this.http.get<AtHomeDto>(`/at-home/server/${chapterId}`);
+  }
+
+  async report(
+    reportUrl: string,
+    url: string,
+    success: boolean,
+    bytes: number,
+    duration: number,
+  ): Promise<void> {
+    if (url.includes('mangadex.org')) return;
+    try {
+      await this.http.postJson(reportUrl, {
+        url,
+        success,
+        bytes,
+        duration,
+        cached: false,
+      });
+    } catch {
+      return;
+    }
+  }
+}
+
 export function buildMangaParams(
-  filters: MangaSearchFilters,
+  filters: ContentSearchFilters,
   languages: string[],
 ): Record<string, QueryValue> {
   const params: Record<string, QueryValue> = {

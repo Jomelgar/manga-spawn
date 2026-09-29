@@ -10,8 +10,9 @@ import { Segmented } from '@/components/ui/segmented';
 import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
 import { useSession } from '@/core/auth/session-provider';
-import { canUseNotifications, isAndroid, isExpoGo } from '@/core/environment';
-import { LANGUAGE_OPTIONS } from '@/domain/models/settings';
+import { useRepositories } from '@/core/di/provider';
+import { isAndroid, isExpoGo } from '@/core/environment';
+import { ContentKind, LANGUAGE_OPTIONS } from '@/domain/models/settings';
 import {
   useConnectMangadex,
   useDisconnectMangadex,
@@ -34,6 +35,12 @@ import {
   useUpdateWeeklyReminder,
   useWeeklyReminder,
 } from '@/features/notifications/use-notifications';
+import {
+  useDeviceId,
+  usePushRegistrationEnabled,
+  useSyncPushRegistration,
+  useUnregisterPush,
+} from '@/features/notifications/use-push-registration';
 import { useTheme } from '@/hooks/use-theme';
 
 export default function SettingsScreen() {
@@ -46,6 +53,7 @@ export default function SettingsScreen() {
         <AccountSection username={session?.username ?? ''} onSignOut={signOut} />
         <SourceAndLanguageSection />
         <MangaDexSection />
+        <ServerSyncSection />
         <NotificationsSection />
       </ScrollView>
     </Screen>
@@ -74,36 +82,46 @@ function AccountSection({ username, onSignOut }: { username: string; onSignOut: 
   );
 }
 
+function SourcePicker({ kind, title }: { kind: ContentKind; title: string }) {
+  const sources = useSources(kind);
+  const activeSourceId = useActiveSourceId(kind);
+  const updateSource = useUpdateActiveSource(kind);
+  const activeSource = sources.find((source) => source.id === activeSourceId);
+
+  if (sources.length === 0) return null;
+
+  return (
+    <Section title={title}>
+      {sources.map((source) => {
+        const selected = source.id === activeSourceId;
+        return (
+          <Button
+            key={source.id}
+            title={selected ? `${source.name} ✓` : source.name}
+            variant={selected ? 'primary' : 'secondary'}
+            loading={updateSource.isPending && updateSource.variables === source.id}
+            onPress={() => updateSource.mutate(source.id)}
+          />
+        );
+      })}
+      {activeSource ? (
+        <ThemedText type="small" themeColor="textSecondary">
+          {activeSource.description} Idiomas: {activeSource.languages.join(', ')}.
+        </ThemedText>
+      ) : null}
+    </Section>
+  );
+}
+
 function SourceAndLanguageSection() {
-  const sources = useSources();
-  const activeSourceId = useActiveSourceId();
-  const updateSource = useUpdateActiveSource();
   const language = useLanguage();
   const updateLanguage = useUpdateLanguage();
 
-  const activeSource = sources.find((source) => source.id === activeSourceId);
-
   return (
     <>
-      <Section title="Fuente de mangas">
-        {sources.map((source) => {
-          const selected = source.id === activeSourceId;
-          return (
-            <Button
-              key={source.id}
-              title={selected ? `${source.name} ✓` : source.name}
-              variant={selected ? 'primary' : 'secondary'}
-              loading={updateSource.isPending && updateSource.variables === source.id}
-              onPress={() => updateSource.mutate(source.id)}
-            />
-          );
-        })}
-        {activeSource ? (
-          <ThemedText type="small" themeColor="textSecondary">
-            {activeSource.description} Idiomas: {activeSource.languages.join(', ')}.
-          </ThemedText>
-        ) : null}
-      </Section>
+      <SourcePicker kind="manga" title="Fuente de mangas" />
+      <SourcePicker kind="book" title="Fuente de libros" />
+      <SourcePicker kind="comic" title="Fuente de comics" />
 
       <Section title="Idioma de lectura">
         <Segmented
@@ -191,8 +209,44 @@ function MangaDexSection() {
   );
 }
 
+function ServerSyncSection() {
+  const enabled = usePushRegistrationEnabled();
+  const deviceId = useDeviceId();
+  const sync = useSyncPushRegistration();
+  const unregister = useUnregisterPush();
+
+  return (
+    <Section title="Servidor de notificaciones">
+      {enabled ? (
+        <>
+          <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
+            Dispositivo: {deviceId.data ?? '—'}
+          </ThemedText>
+          <Button
+            title="Sincronizar ahora"
+            loading={sync.isPending}
+            onPress={() => sync.mutate()}
+          />
+          <Button
+            title="Desregistrar dispositivo"
+            variant="secondary"
+            loading={unregister.isPending}
+            onPress={() => unregister.mutate()}
+          />
+        </>
+      ) : (
+        <ThemedText type="small" themeColor="textSecondary">
+          Define EXPO_PUBLIC_NOTIFICATIONS_API_URL en el .env para activar el envío desde tu
+          servidor.
+        </ThemedText>
+      )}
+    </Section>
+  );
+}
+
 function NotificationsSection() {
   const theme = useTheme();
+  const { notifications } = useRepositories();
   const permission = useNotificationPermission();
   const requestPermission = useRequestNotificationPermission();
   const weekly = useWeeklyReminder();
@@ -204,7 +258,7 @@ function NotificationsSection() {
   const [copied, setCopied] = useState(false);
 
   const config = weekly.data;
-  const notificationsAvailable = canUseNotifications();
+  const notificationsAvailable = notifications.isSupported();
 
   return (
     <>

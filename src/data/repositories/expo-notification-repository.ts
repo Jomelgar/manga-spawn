@@ -23,15 +23,19 @@ type NotificationsModule = typeof NotificationsType;
 let cachedModule: NotificationsModule | null = null;
 
 /**
- * Loads `expo-notifications` lazily. Importing it at module scope crashes
- * Expo Go on Android (expo/expo#49044), so we only evaluate it on demand.
+ * Loads `expo-notifications` lazily and safely. Importing it can crash on
+ * Expo Go (Android) because some native modules are missing (expo/expo#49044),
+ * so we swallow the error and degrade to an unsupported repository.
  */
-function loadNotifications(): NotificationsModule {
-  if (!cachedModule) {
+function tryLoadNotifications(): NotificationsModule | null {
+  if (cachedModule) return cachedModule;
+  try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     cachedModule = require('expo-notifications') as NotificationsModule;
+    return cachedModule;
+  } catch {
+    return null;
   }
-  return cachedModule;
 }
 
 function extractUrl(response: NotificationsType.NotificationResponse | null): string | null {
@@ -40,14 +44,17 @@ function extractUrl(response: NotificationsType.NotificationResponse | null): st
 }
 
 export class ExpoNotificationRepository implements NotificationRepository {
+  private readonly notifications: NotificationsModule | null;
+
   constructor(private readonly store: KeyValueStore = appStore) {
-    if (this.isSupported()) {
-      this.initialize();
+    this.notifications = canUseNotifications() ? tryLoadNotifications() : null;
+    if (this.notifications) {
+      this.initialize(this.notifications);
     }
   }
 
-  private initialize(): void {
-    loadNotifications().setNotificationHandler({
+  private initialize(notifications: NotificationsModule): void {
+    notifications.setNotificationHandler({
       handleNotification: async () => ({
         shouldPlaySound: true,
         shouldSetBadge: true,
@@ -58,19 +65,19 @@ export class ExpoNotificationRepository implements NotificationRepository {
   }
 
   isSupported(): boolean {
-    return canUseNotifications();
+    return this.notifications !== null;
   }
 
   async getPermissionStatus(): Promise<'granted' | 'denied' | 'undetermined'> {
     if (!this.isSupported()) return 'denied';
-    const { status } = await loadNotifications().getPermissionsAsync();
+    const { status } = await this.notifications!.getPermissionsAsync();
     return normalizeStatus(status);
   }
 
   async requestPermission(): Promise<'granted' | 'denied' | 'undetermined'> {
     if (!this.isSupported()) return 'denied';
     await this.ensureChannels();
-    const { status } = await loadNotifications().requestPermissionsAsync();
+    const { status } = await this.notifications!.requestPermissionsAsync();
     return normalizeStatus(status);
   }
 
@@ -90,7 +97,7 @@ export class ExpoNotificationRepository implements NotificationRepository {
       );
     }
 
-    const token = (await loadNotifications().getExpoPushTokenAsync({ projectId })).data;
+    const token = (await this.notifications!.getExpoPushTokenAsync({ projectId })).data;
     const info: PushTokenInfo = {
       token,
       platform: Platform.OS,
@@ -127,7 +134,7 @@ export class ExpoNotificationRepository implements NotificationRepository {
 
   async scheduleLocalTest(title: string, body: string): Promise<void> {
     if (!this.isSupported()) return;
-    const notifications = loadNotifications();
+    const notifications = this.notifications!;
     await this.ensureChannels();
     await notifications.scheduleNotificationAsync({
       content: {
@@ -154,7 +161,7 @@ export class ExpoNotificationRepository implements NotificationRepository {
   async setWeeklyReminder(config: WeeklyReminderConfig): Promise<void> {
     await writeJson(this.store, STORAGE_KEYS.weeklyReminder, config);
     if (!config.enabled && this.isSupported()) {
-      await loadNotifications().cancelScheduledNotificationAsync(WEEKLY_IDENTIFIER);
+      await this.notifications!.cancelScheduledNotificationAsync(WEEKLY_IDENTIFIER);
     }
   }
 
@@ -163,7 +170,7 @@ export class ExpoNotificationRepository implements NotificationRepository {
     const config = await this.getWeeklyReminder();
     if (!config.enabled) return;
 
-    const notifications = loadNotifications();
+    const notifications = this.notifications!;
     await this.ensureChannels();
     await notifications.scheduleNotificationAsync({
       identifier: WEEKLY_IDENTIFIER,
@@ -185,7 +192,7 @@ export class ExpoNotificationRepository implements NotificationRepository {
 
   async notifyNewChapters(alerts: NewChapterAlert[]): Promise<void> {
     if (!this.isSupported() || alerts.length === 0) return;
-    const notifications = loadNotifications();
+    const notifications = this.notifications!;
     await this.ensureChannels();
 
     const single = alerts.length === 1 ? alerts[0] : null;
@@ -211,12 +218,12 @@ export class ExpoNotificationRepository implements NotificationRepository {
 
   async getInitialNotificationUrl(): Promise<string | null> {
     if (!this.isSupported()) return null;
-    return extractUrl(loadNotifications().getLastNotificationResponse());
+    return extractUrl(this.notifications!.getLastNotificationResponse());
   }
 
   subscribeToNotificationResponses(onUrl: (url: string) => void): () => void {
     if (!this.isSupported()) return () => {};
-    const subscription = loadNotifications().addNotificationResponseReceivedListener(
+    const subscription = this.notifications!.addNotificationResponseReceivedListener(
       (response) => {
         const url = extractUrl(response);
         if (url) onUrl(url);
@@ -227,7 +234,7 @@ export class ExpoNotificationRepository implements NotificationRepository {
 
   private async ensureChannels(): Promise<void> {
     if (Platform.OS !== 'android') return;
-    const notifications = loadNotifications();
+    const notifications = this.notifications!;
     await notifications.setNotificationChannelAsync(DEFAULT_CHANNEL, {
       name: 'General',
       importance: notifications.AndroidImportance.HIGH,

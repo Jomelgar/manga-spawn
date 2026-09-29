@@ -9,9 +9,4 @@ export const LANGUAGE_OPTIONS: { value: LanguagePreference; label: string }[] = 
 
 export const DEFAULT_LANGUAGE: LanguagePreference = 'es';
 
-export interface SourceInfo {
-  id: string;
-  name: string;
-  languages: string[];
-  description: string;
-}
+export type { ContentInfo as SourceInfo, ContentKind, ReaderKind } from '@manga-spawn/content-sources';

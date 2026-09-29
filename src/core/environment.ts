@@ -1,4 +1,5 @@
 import Constants from 'expo-constants';
+import { isRunningInExpoGo } from 'expo';
 import { Platform } from 'react-native';
 
 export type ExecutionEnvironment = 'bare' | 'standalone' | 'storeClient';
@@ -10,7 +11,15 @@ export const isIos = Platform.OS === 'ios';
 export const executionEnvironment = (Constants.executionEnvironment ??
   'bare') as ExecutionEnvironment;
 
-export const isExpoGo = executionEnvironment === 'storeClient';
+function detectExpoGo(): boolean {
+  try {
+    return isRunningInExpoGo();
+  } catch {
+    return executionEnvironment === 'storeClient';
+  }
+}
+
+export const isExpoGo = detectExpoGo();
 
 export const expoGoNotificationsEnabled =
   process.env.EXPO_PUBLIC_EXPO_GO_NOTIFICATIONS === '1';

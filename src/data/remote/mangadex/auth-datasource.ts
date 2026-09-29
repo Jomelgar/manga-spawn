@@ -1,7 +1,6 @@
-import { MANGADEX_AUTH_URL } from '@/core/config';
+import { HttpClient, TokenDto } from '@manga-spawn/content-sources';
 
-import { TokenDto } from './dto';
-import { HttpClient } from './http-client';
+import { MANGADEX_AUTH_URL } from '@/core/config';
 
 export interface PasswordGrantInput {
   clientId: string;

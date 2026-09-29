@@ -55,7 +55,11 @@ export default function MangaDetailScreen() {
     <View style={styles.header}>
       <View style={styles.top}>
         {manga.coverUrl ? (
-          <Image source={{ uri: manga.coverUrl }} style={styles.cover} contentFit="cover" />
+          <Image
+            source={{ uri: manga.coverUrl, headers: manga.coverHeaders }}
+            style={styles.cover}
+            contentFit="cover"
+          />
         ) : (
           <View style={[styles.cover, { backgroundColor: theme.backgroundElement }]} />
         )}

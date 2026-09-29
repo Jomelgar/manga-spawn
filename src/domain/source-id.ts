@@ -1,4 +1,14 @@
+import type { ContentKind } from './models/manga';
+
 export const DEFAULT_SOURCE_ID = 'mangadex';
+
+export const DEFAULT_SOURCE_IDS: Record<ContentKind, string> = {
+  manga: 'mangadex',
+  book: 'gutenberg',
+  comic: 'marmota',
+};
+
+export const CONTENT_KINDS: ContentKind[] = ['manga', 'book', 'comic'];
 
 export interface ParsedSourceId {
   sourceId: string;

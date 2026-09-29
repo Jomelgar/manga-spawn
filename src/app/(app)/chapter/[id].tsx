@@ -1,8 +1,8 @@
-import { Image } from 'expo-image';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, StyleSheet, useWindowDimensions, type ViewToken } from 'react-native';
 
+import { BookReader } from '@/components/book-reader';
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -17,40 +17,31 @@ import { useMangaProgress, useSaveProgress } from '@/features/library/use-librar
 import {
   useChapterDetail,
   useChapterFeed,
-  useChapterPages,
+  useChapterReader,
   useMangaDetail,
 } from '@/features/manga/use-manga';
-import { useTheme } from '@/hooks/use-theme';
+import { useReaderSettings } from '@/features/reader/use-reader-settings';
+import { ZoomableImage } from '@/components/zoomable-image';
 
 const PAGE_RATIO = 1.4;
-
-function ChapterPageImage({ page, width }: { page: ChapterPage; width: number }) {
-  const theme = useTheme();
-  return (
-    <Image
-      source={{ uri: page.url, headers: page.headers }}
-      style={{ width, height: width * PAGE_RATIO, backgroundColor: theme.backgroundElement }}
-      contentFit="contain"
-      transition={150}
-    />
-  );
-}
 
 export default function ChapterReaderScreen() {
   const params = useLocalSearchParams<{ id: string; mangaId?: string }>();
   const chapterId = params.id;
   const { width } = useWindowDimensions();
   const { notifications } = useRepositories();
+  const { settings: readerSettings, update: updateReaderSettings } = useReaderSettings();
 
   const { data: chapter, isLoading: loadingChapter } = useChapterDetail(chapterId);
   const mangaId = params.mangaId ?? chapter?.mangaId ?? '';
   const { data: manga } = useMangaDetail(mangaId);
   const { data: chapters } = useChapterFeed(mangaId);
-  const { data: pages, isLoading, isError } = useChapterPages(chapterId);
+  const { data: reader, isLoading, isError } = useChapterReader(chapterId);
   const { data: savedProgress, isLoading: loadingProgress } = useMangaProgress(mangaId);
   const saveProgress = useSaveProgress();
 
   const [currentPage, setCurrentPage] = useState(0);
+  const [scrollEnabled, setScrollEnabled] = useState(true);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const persist = useCallback(
@@ -58,8 +49,10 @@ export default function ChapterReaderScreen() {
       if (!mangaId || !chapterId) return;
       const progress = {
         mangaId,
+        kind: manga?.kind ?? 'manga',
         mangaTitle: manga?.title ?? 'Manga',
         coverUrl: manga?.coverUrl ?? null,
+        coverHeaders: manga?.coverHeaders,
         chapterId,
         chapterNumber: chapter?.chapter ?? null,
         page,
@@ -77,25 +70,41 @@ export default function ChapterReaderScreen() {
     [mangaId, chapterId, manga, chapter, saveProgress, notifications],
   );
 
+  const scheduleSave = useCallback(
+    (page: number) => {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      saveTimer.current = setTimeout(() => persist(page), 900);
+    },
+    [persist],
+  );
+
   useEffect(() => {
-    if (!mangaId || !chapterId) return;
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => persist(currentPage), 900);
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
     };
-  }, [currentPage, mangaId, chapterId, persist]);
+  }, []);
 
   const onViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
       const first = viewableItems.find((token) => token.isViewable);
-      if (first?.index != null) setCurrentPage(first.index);
+      if (first?.index != null) {
+        setCurrentPage(first.index);
+        scheduleSave(first.index);
+      }
     },
-    [],
+    [scheduleSave],
   );
 
   const renderItem = useCallback(
-    ({ item }: { item: ChapterPage }) => <ChapterPageImage page={item} width={width} />,
+    ({ item }: { item: ChapterPage }) => (
+      <ZoomableImage
+        uri={item.url}
+        headers={item.headers}
+        width={width}
+        height={width * PAGE_RATIO}
+        onZoomChange={(zoomed) => setScrollEnabled(!zoomed)}
+      />
+    ),
     [width],
   );
 
@@ -119,23 +128,41 @@ export default function ChapterReaderScreen() {
   if (isLoading || loadingChapter || loadingProgress) {
     return (
       <Screen edges={['left', 'right']}>
-        <Loading message="Cargando páginas…" />
+        <Loading message="Cargando contenido…" />
       </Screen>
     );
   }
 
-  if (isError || !pages) {
+  if (isError || !reader) {
     return (
       <Screen edges={['left', 'right']}>
-        <EmptyState title="No se pudo cargar el capítulo" message="Intenta más tarde." />
+        <EmptyState title="No se pudo cargar el contenido" message="Intenta más tarde." />
       </Screen>
     );
   }
 
-  const total = pages.pages.length;
-  const initialIndex =
-    savedProgress?.chapterId === chapterId ? Math.min(savedProgress.page, total - 1) : 0;
+  const initialIndex = savedProgress?.chapterId === chapterId ? savedProgress.page : 0;
   const chapterLabel = chapter?.chapter ? `Cap. ${chapter.chapter}` : '';
+
+  if (reader.type === 'text' || reader.type === 'html') {
+    return (
+      <Screen edges={['left', 'right', 'bottom']}>
+        <Stack.Screen options={{ title: reader.title ?? manga?.title ?? 'Leyendo' }} />
+        <BookReader
+          body={reader.body}
+          format={reader.type}
+          initialParagraph={initialIndex}
+          onProgress={scheduleSave}
+          settings={readerSettings}
+          onSettingsChange={updateReaderSettings}
+        />
+      </Screen>
+    );
+  }
+
+  const pages = reader.pages;
+  const total = pages.length;
+  const imageInitialIndex = Math.min(initialIndex, Math.max(0, total - 1));
 
   return (
     <Screen edges={['left', 'right', 'bottom']}>
@@ -150,10 +177,11 @@ export default function ChapterReaderScreen() {
       </ThemedView>
 
       <FlatList
-        data={pages.pages}
+        data={pages}
         keyExtractor={(item) => item.fileName}
         renderItem={renderItem}
-        initialScrollIndex={initialIndex}
+        initialScrollIndex={imageInitialIndex}
+        scrollEnabled={scrollEnabled}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={{ itemVisiblePercentThreshold: 60 }}
         getItemLayout={(_, index) => ({

@@ -10,6 +10,7 @@ import { Pressable, StyleSheet, useColorScheme, View } from 'react-native';
 
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
+import { LogoMark } from './logo';
 
 import { Colors, MaxContentWidth, Spacing } from '@/constants/theme';
 
@@ -58,9 +59,12 @@ export function CustomTabList(props: TabListProps) {
   return (
     <View {...props} style={styles.tabListContainer}>
       <ThemedView type="backgroundElement" style={styles.innerContainer}>
-        <ThemedText type="smallBold" style={[styles.brandText, { color: colors.accent }]}>
-          manga-spawn
-        </ThemedText>
+        <View style={styles.brandRow}>
+          <LogoMark size={22} />
+          <ThemedText type="smallBold" style={{ color: colors.accent }}>
+            manga-spawn
+          </ThemedText>
+        </View>
         {props.children}
       </ThemedView>
     </View>
@@ -86,8 +90,11 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
     maxWidth: MaxContentWidth,
   },
-  brandText: {
+  brandRow: {
     marginRight: 'auto',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
   },
   pressed: {
     opacity: 0.7,

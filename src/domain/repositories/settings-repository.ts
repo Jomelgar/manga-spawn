@@ -1,8 +1,8 @@
-import { LanguagePreference } from '../models/settings';
+import { ContentKind, LanguagePreference } from '../models/settings';
 
 export interface SettingsRepository {
   getLanguage(): Promise<LanguagePreference>;
   setLanguage(language: LanguagePreference): Promise<void>;
-  getActiveSourceId(): Promise<string>;
-  setActiveSourceId(sourceId: string): Promise<void>;
+  getActiveSourceId(kind: ContentKind): Promise<string>;
+  setActiveSourceId(kind: ContentKind, sourceId: string): Promise<void>;
 }

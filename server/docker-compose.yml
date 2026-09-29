@@ -1,0 +1,15 @@
+services:
+  server:
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+    ports:
+      - '8787:8787'
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_PATH: /app/server/data/manga-spawn.sqlite
+    volumes:
+      - ./data:/app/server/data
+    restart: unless-stopped

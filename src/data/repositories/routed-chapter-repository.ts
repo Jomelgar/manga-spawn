@@ -1,4 +1,6 @@
-import { Chapter, ChapterFeedParams, ChapterPages } from '@/domain/models/chapter';
+import { ReaderContent } from '@manga-spawn/content-sources';
+
+import { Chapter, ChapterFeedParams } from '@/domain/models/chapter';
 import { ChapterRepository } from '@/domain/repositories/chapter-repository';
 import { parseSourceId, withSource } from '@/domain/source-id';
 
@@ -37,10 +39,10 @@ export class RoutedChapterRepository implements ChapterRepository {
     return chapter ? prefixChapter(source.info.id, chapter) : null;
   }
 
-  async getPages(chapterId: string): Promise<ChapterPages> {
+  async getReader(chapterId: string): Promise<ReaderContent> {
     const { sourceId, rawId } = parseSourceId(chapterId);
     const source = await this.resolve(sourceId);
-    return source.getPages(rawId);
+    return source.getReader(rawId);
   }
 
   async reportPage(url: string, success: boolean, bytes: number, duration: number): Promise<void> {
@@ -52,6 +54,6 @@ export class RoutedChapterRepository implements ChapterRepository {
 
   private async resolve(sourceId: string) {
     await this.registry.ready();
-    return this.registry.get(sourceId) ?? this.registry.getActive();
+    return this.registry.get(sourceId) ?? this.registry.getActive('manga');
   }
 }

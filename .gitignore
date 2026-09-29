@@ -40,6 +40,9 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
+# servidor de notificaciones
+server/data/
+
 example
 
 # generated native folders

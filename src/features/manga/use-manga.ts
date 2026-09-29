@@ -1,3 +1,4 @@
+import type { ContentKind } from '@manga-spawn/content-sources';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 
 import { useRepositories } from '@/core/di/provider';
@@ -8,25 +9,28 @@ const PAGE_SIZE = 20;
 
 export const mangaKeys = {
   all: ['manga'] as const,
-  popular: (sourceId: string) => [...mangaKeys.all, 'popular', sourceId] as const,
-  latest: (sourceId: string) => [...mangaKeys.all, 'latest', sourceId] as const,
-  search: (sourceId: string, filters: MangaSearchFilters) =>
-    [...mangaKeys.all, 'search', sourceId, filters] as const,
+  popular: (kind: ContentKind, sourceId: string) =>
+    [...mangaKeys.all, 'popular', kind, sourceId] as const,
+  latest: (kind: ContentKind, sourceId: string) =>
+    [...mangaKeys.all, 'latest', kind, sourceId] as const,
+  search: (kind: ContentKind, sourceId: string, filters: MangaSearchFilters) =>
+    [...mangaKeys.all, 'search', kind, sourceId, filters] as const,
   detail: (id: string) => [...mangaKeys.all, 'detail', id] as const,
-  tags: (sourceId: string) => [...mangaKeys.all, 'tags', sourceId] as const,
+  tags: (kind: ContentKind, sourceId: string) =>
+    [...mangaKeys.all, 'tags', kind, sourceId] as const,
   feed: (id: string) => [...mangaKeys.all, 'feed', id] as const,
-  pages: (id: string) => [...mangaKeys.all, 'pages', id] as const,
+  reader: (id: string) => [...mangaKeys.all, 'reader', id] as const,
   chapter: (id: string) => [...mangaKeys.all, 'chapter', id] as const,
 };
 
-export function usePopularManga(enabled = true) {
+export function usePopularManga(kind: ContentKind = 'manga', enabled = true) {
   const { manga } = useRepositories();
-  const sourceId = useActiveSourceId();
+  const sourceId = useActiveSourceId(kind);
   return useInfiniteQuery({
-    queryKey: mangaKeys.popular(sourceId ?? 'unknown'),
+    queryKey: mangaKeys.popular(kind, sourceId ?? 'unknown'),
     enabled: enabled && Boolean(sourceId),
     initialPageParam: 0,
-    queryFn: ({ pageParam }) => manga.getPopular(pageParam, PAGE_SIZE),
+    queryFn: ({ pageParam }) => manga.getPopular(pageParam, PAGE_SIZE, kind),
     getNextPageParam: (lastPage) => {
       const next = lastPage.offset + lastPage.limit;
       return next < lastPage.total ? next : undefined;
@@ -34,14 +38,14 @@ export function usePopularManga(enabled = true) {
   });
 }
 
-export function useLatestManga(enabled = true) {
+export function useLatestManga(kind: ContentKind = 'manga', enabled = true) {
   const { manga } = useRepositories();
-  const sourceId = useActiveSourceId();
+  const sourceId = useActiveSourceId(kind);
   return useInfiniteQuery({
-    queryKey: mangaKeys.latest(sourceId ?? 'unknown'),
+    queryKey: mangaKeys.latest(kind, sourceId ?? 'unknown'),
     enabled: enabled && Boolean(sourceId),
     initialPageParam: 0,
-    queryFn: ({ pageParam }) => manga.getLatest(pageParam, PAGE_SIZE),
+    queryFn: ({ pageParam }) => manga.getLatest(pageParam, PAGE_SIZE, kind),
     getNextPageParam: (lastPage) => {
       const next = lastPage.offset + lastPage.limit;
       return next < lastPage.total ? next : undefined;
@@ -49,14 +53,18 @@ export function useLatestManga(enabled = true) {
   });
 }
 
-export function useMangaSearch(filters: MangaSearchFilters, enabled: boolean) {
+export function useMangaSearch(
+  filters: MangaSearchFilters,
+  enabled: boolean,
+  kind: ContentKind = 'manga',
+) {
   const { manga } = useRepositories();
-  const sourceId = useActiveSourceId();
+  const sourceId = useActiveSourceId(kind);
   return useInfiniteQuery({
-    queryKey: mangaKeys.search(sourceId ?? 'unknown', filters),
+    queryKey: mangaKeys.search(kind, sourceId ?? 'unknown', filters),
     enabled: enabled && Boolean(sourceId),
     initialPageParam: 0,
-    queryFn: ({ pageParam }) => manga.search(filters, pageParam, PAGE_SIZE),
+    queryFn: ({ pageParam }) => manga.search(filters, pageParam, PAGE_SIZE, kind),
     getNextPageParam: (lastPage) => {
       const next = lastPage.offset + lastPage.limit;
       return next < lastPage.total ? next : undefined;
@@ -64,12 +72,12 @@ export function useMangaSearch(filters: MangaSearchFilters, enabled: boolean) {
   });
 }
 
-export function useMangaTags() {
+export function useMangaTags(kind: ContentKind = 'manga') {
   const { manga } = useRepositories();
-  const sourceId = useActiveSourceId();
+  const sourceId = useActiveSourceId(kind);
   return useQuery({
-    queryKey: mangaKeys.tags(sourceId ?? 'unknown'),
-    queryFn: () => manga.getTags(),
+    queryKey: mangaKeys.tags(kind, sourceId ?? 'unknown'),
+    queryFn: () => manga.getTags(kind),
     enabled: Boolean(sourceId),
   });
 }
@@ -92,11 +100,11 @@ export function useChapterFeed(mangaId: string) {
   });
 }
 
-export function useChapterPages(chapterId: string) {
+export function useChapterReader(chapterId: string) {
   const { chapter } = useRepositories();
   return useQuery({
-    queryKey: mangaKeys.pages(chapterId),
-    queryFn: () => chapter.getPages(chapterId),
+    queryKey: mangaKeys.reader(chapterId),
+    queryFn: () => chapter.getReader(chapterId),
     enabled: Boolean(chapterId),
   });
 }

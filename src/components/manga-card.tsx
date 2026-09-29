@@ -23,7 +23,7 @@ export function MangaCard({ manga, width }: { manga: Manga; width: number }) {
         ]}>
         {manga.coverUrl ? (
           <Image
-            source={{ uri: manga.coverUrl }}
+            source={{ uri: manga.coverUrl, headers: manga.coverHeaders }}
             style={StyleSheet.absoluteFill}
             contentFit="cover"
             transition={200}

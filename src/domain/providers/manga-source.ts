@@ -1,4 +1,6 @@
-import { Chapter, ChapterPages } from '../models/chapter';
+import { ReaderContent } from '@manga-spawn/content-sources';
+
+import { Chapter } from '../models/chapter';
 import { Manga, MangaSearchFilters, MangaTag, Page } from '../models/manga';
 import { SourceInfo } from '../models/settings';
 
@@ -13,7 +15,7 @@ export interface MangaSource {
 
   getChapters(rawMangaId: string): Promise<Chapter[]>;
   getChapter(rawChapterId: string): Promise<Chapter>;
-  getPages(rawChapterId: string): Promise<ChapterPages>;
+  getReader(rawChapterId: string): Promise<ReaderContent>;
   getLatestChapter?(rawMangaId: string): Promise<Chapter | null>;
 
   reportPage?(url: string, success: boolean, bytes: number, duration: number): Promise<void>;

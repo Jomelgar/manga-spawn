@@ -5,6 +5,7 @@ import { useSession } from '@/core/auth/session-provider';
 import { useRepositories } from '@/core/di/provider';
 import { buildWeeklyReminderMessage } from '@/domain/services/weekly-reminder-message';
 import { NewChapterChecker } from '@/domain/services/new-chapter-checker';
+import { toServerSubscriptions } from '@/domain/services/server-subscriptions';
 
 export function NotificationObserver() {
   const { session } = useSession();
@@ -28,14 +29,20 @@ export function NotificationObserver() {
     if (!session || bootstrapped.current) return;
     bootstrapped.current = true;
 
-    const { library, notifications, chapter } = repositories;
+    const { library, notifications, chapter, pushRegistration } = repositories;
 
     (async () => {
       const progress = await library.getLastRead();
       const message = buildWeeklyReminderMessage(progress);
       await notifications.syncWeeklyReminder(message.title, message.body, message.url);
 
-      await new NewChapterChecker(chapter, library, notifications).run();
+      const followed = await library.listFollowed();
+
+      if (pushRegistration.isEnabled()) {
+        await pushRegistration.syncSubscriptions(toServerSubscriptions(followed));
+      } else {
+        await new NewChapterChecker(chapter, library, notifications).run();
+      }
     })().catch(() => undefined);
   }, [session, repositories]);
 

@@ -5,8 +5,10 @@ export interface LibraryRepository {
   isFollowed(mangaId: string): Promise<boolean>;
   follow(manga: {
     mangaId: string;
+    kind: import('@manga-spawn/content-sources').ContentKind;
     title: string;
     coverUrl: string | null;
+    coverHeaders?: Record<string, string>;
     lastKnownChapterId: string | null;
     lastKnownChapterNumber: string | null;
   }): Promise<void>;
@@ -20,4 +22,5 @@ export interface LibraryRepository {
   saveProgress(progress: ReadingProgress): Promise<void>;
   getLastRead(): Promise<ReadingProgress | null>;
   getProgress(mangaId: string): Promise<ReadingProgress | null>;
+  listInProgress(): Promise<ReadingProgress[]>;
 }
