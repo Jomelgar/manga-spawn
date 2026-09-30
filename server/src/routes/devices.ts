@@ -27,10 +27,29 @@ const subscriptionsSchema = z.object({
   items: z.array(subscriptionSchema).max(2000),
 });
 
+const syncSchema = deviceSchema.extend({
+  items: z.array(subscriptionSchema).max(2000),
+});
+
 function splitSourceId(mangaId: string): { sourceId: string; rawId: string } {
   const index = mangaId.indexOf(':');
   if (index <= 0) return { sourceId: 'mangadex', rawId: mangaId };
   return { sourceId: mangaId.slice(0, index), rawId: mangaId.slice(index + 1) };
+}
+
+function mapSubscriptionItems(items: z.infer<typeof subscriptionSchema>[]) {
+  return items.map((item) => {
+    const { sourceId, rawId } = splitSourceId(item.mangaId);
+    return {
+      mangaId: item.mangaId,
+      kind: item.kind,
+      sourceId,
+      rawId,
+      title: item.title,
+      coverUrl: item.coverUrl ?? null,
+      lastKnownChapterId: item.lastKnownChapterId ?? null,
+    };
+  });
 }
 
 export const devicesRoutes = new Hono();
@@ -66,19 +85,24 @@ devicesRoutes.put('/:id/subscriptions', async (c) => {
     return c.json({ error: 'invalid_body', details: parsed.error.flatten() }, 400);
   }
 
-  const items = parsed.data.items.map((item) => {
-    const { sourceId, rawId } = splitSourceId(item.mangaId);
-    return {
-      mangaId: item.mangaId,
-      kind: item.kind,
-      sourceId,
-      rawId,
-      title: item.title,
-      coverUrl: item.coverUrl ?? null,
-      lastKnownChapterId: item.lastKnownChapterId ?? null,
-    };
-  });
+  const items = mapSubscriptionItems(parsed.data.items);
 
   replaceSubscriptions(deviceId, items);
   return c.json({ ok: true, count: items.length });
+});
+
+devicesRoutes.post('/sync', async (c) => {
+  const parsed = syncSchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) {
+    return c.json({ error: 'invalid_body', details: parsed.error.flatten() }, 400);
+  }
+
+  const { deviceId, token, platform, items } = parsed.data;
+
+  upsertDevice({ id: deviceId, token, platform });
+
+  const mapped = mapSubscriptionItems(items);
+  replaceSubscriptions(deviceId, mapped);
+
+  return c.json({ ok: true, count: mapped.length });
 });

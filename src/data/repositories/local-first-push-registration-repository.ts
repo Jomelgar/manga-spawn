@@ -67,8 +67,8 @@ export class LocalFirstPushRegistrationRepository implements PushRegistrationRep
     };
 
     try {
-      await this.request('POST', '/v1/devices', device);
-      await this.request('PUT', `/v1/devices/${deviceId}/subscriptions`, {
+      await this.request('POST', '/v1/devices/sync', {
+        ...device,
         items: pending.subscriptions,
       });
       await this.writePending({

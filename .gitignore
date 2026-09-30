@@ -34,6 +34,9 @@ yarn-error.*
 .env*.local
 .env
 
+# Firebase service account keys (secret)
+*firebase-adminsdk*.json
+
 # optional expo-go patch (applied on demand)
 /patches/
 

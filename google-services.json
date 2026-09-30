@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "642255609108",
+    "project_id": "manga-spawn-a99b4",
+    "storage_bucket": "manga-spawn-a99b4.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:642255609108:android:d6357c8abf33b48250b601",
+        "android_client_info": {
+          "package_name": "com.mangaspawn.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAg35Ls0ejfzI4FYLu0t-v0dcF6tApYAPI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
