@@ -14,6 +14,9 @@ const KIND_LABEL: Record<ReadingProgress['kind'], string> = {
   comic: 'Comic',
 };
 
+const TITLE_LINE_HEIGHT = 20;
+const TITLE_LINES = 2;
+
 export function ContinueReading({ items }: { items: ReadingProgress[] }) {
   const theme = useTheme();
 
@@ -51,7 +54,7 @@ export function ContinueReading({ items }: { items: ReadingProgress[] }) {
                   style={[styles.cover, { backgroundColor: theme.backgroundSelected }]}
                 />
               )}
-              <ThemedText type="smallBold" numberOfLines={2} style={styles.title}>
+              <ThemedText type="smallBold" numberOfLines={TITLE_LINES} style={styles.title}>
                 {item.mangaTitle}
               </ThemedText>
               <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
@@ -87,6 +90,7 @@ const styles = StyleSheet.create({
   },
   title: {
     marginTop: Spacing.half,
+    minHeight: TITLE_LINE_HEIGHT * TITLE_LINES,
   },
   pressed: {
     opacity: 0.7,

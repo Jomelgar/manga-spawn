@@ -1,8 +1,9 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, StyleSheet, useWindowDimensions, type ViewToken } from 'react-native';
+import { Pressable, StyleSheet } from 'react-native';
 
 import { BookReader } from '@/components/book-reader';
+import { ImageReader } from '@/components/image-reader';
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -11,7 +12,6 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Loading } from '@/components/ui/loading';
 import { Spacing } from '@/constants/theme';
 import { useRepositories } from '@/core/di/provider';
-import { ChapterPage } from '@/domain/models/chapter';
 import { buildWeeklyReminderMessage } from '@/domain/services/weekly-reminder-message';
 import { useMangaProgress, useSaveProgress } from '@/features/library/use-library';
 import {
@@ -21,14 +21,10 @@ import {
   useMangaDetail,
 } from '@/features/manga/use-manga';
 import { useReaderSettings } from '@/features/reader/use-reader-settings';
-import { ZoomableImage } from '@/components/zoomable-image';
-
-const PAGE_RATIO = 1.4;
 
 export default function ChapterReaderScreen() {
   const params = useLocalSearchParams<{ id: string; mangaId?: string }>();
   const chapterId = params.id;
-  const { width } = useWindowDimensions();
   const { notifications } = useRepositories();
   const { settings: readerSettings, update: updateReaderSettings } = useReaderSettings();
 
@@ -40,9 +36,13 @@ export default function ChapterReaderScreen() {
   const { data: savedProgress, isLoading: loadingProgress } = useMangaProgress(mangaId);
   const saveProgress = useSaveProgress();
 
-  const [currentPage, setCurrentPage] = useState(0);
-  const [scrollEnabled, setScrollEnabled] = useState(true);
+  const [pageState, setPageState] = useState<{ chapterId: string; index: number } | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const total = reader?.type === 'images' ? reader.pages.length : 0;
+  const savedIndex = savedProgress?.chapterId === chapterId ? savedProgress.page : 0;
+  const imageInitialIndex = total > 0 ? Math.min(savedIndex, total - 1) : 0;
+  const currentPage = pageState?.chapterId === chapterId ? pageState.index : imageInitialIndex;
 
   const persist = useCallback(
     (page: number) => {
@@ -84,28 +84,12 @@ export default function ChapterReaderScreen() {
     };
   }, []);
 
-  const onViewableItemsChanged = useCallback(
-    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
-      const first = viewableItems.find((token) => token.isViewable);
-      if (first?.index != null) {
-        setCurrentPage(first.index);
-        scheduleSave(first.index);
-      }
+  const handlePageChange = useCallback(
+    (index: number) => {
+      setPageState({ chapterId, index });
+      scheduleSave(index);
     },
-    [scheduleSave],
-  );
-
-  const renderItem = useCallback(
-    ({ item }: { item: ChapterPage }) => (
-      <ZoomableImage
-        uri={item.url}
-        headers={item.headers}
-        width={width}
-        height={width * PAGE_RATIO}
-        onZoomChange={(zoomed) => setScrollEnabled(!zoomed)}
-      />
-    ),
-    [width],
+    [chapterId, scheduleSave],
   );
 
   const { previousChapter, nextChapter } = useMemo(() => {
@@ -141,7 +125,6 @@ export default function ChapterReaderScreen() {
     );
   }
 
-  const initialIndex = savedProgress?.chapterId === chapterId ? savedProgress.page : 0;
   const chapterLabel = chapter?.chapter ? `Cap. ${chapter.chapter}` : '';
 
   if (reader.type === 'text' || reader.type === 'html') {
@@ -151,7 +134,7 @@ export default function ChapterReaderScreen() {
         <BookReader
           body={reader.body}
           format={reader.type}
-          initialParagraph={initialIndex}
+          initialParagraph={savedIndex}
           onProgress={scheduleSave}
           settings={readerSettings}
           onSettingsChange={updateReaderSettings}
@@ -161,8 +144,7 @@ export default function ChapterReaderScreen() {
   }
 
   const pages = reader.pages;
-  const total = pages.length;
-  const imageInitialIndex = Math.min(initialIndex, Math.max(0, total - 1));
+  const isPaged = readerSettings.mode === 'paged';
 
   return (
     <Screen edges={['left', 'right', 'bottom']}>
@@ -171,25 +153,25 @@ export default function ChapterReaderScreen() {
         <ThemedText type="smallBold" numberOfLines={1} style={styles.statusTitle}>
           {chapterLabel || manga?.title || 'Leyendo'}
         </ThemedText>
+        <Pressable
+          hitSlop={8}
+          onPress={() =>
+            updateReaderSettings({ ...readerSettings, mode: isPaged ? 'vertical' : 'paged' })
+          }>
+          <ThemedText type="smallBold" themeColor="accent">
+            {isPaged ? 'Paginado' : 'Scroll'}
+          </ThemedText>
+        </Pressable>
         <ThemedText type="small" themeColor="textSecondary">
           {currentPage + 1}/{total}
         </ThemedText>
       </ThemedView>
 
-      <FlatList
-        data={pages}
-        keyExtractor={(item) => item.fileName}
-        renderItem={renderItem}
-        initialScrollIndex={imageInitialIndex}
-        scrollEnabled={scrollEnabled}
-        onViewableItemsChanged={onViewableItemsChanged}
-        viewabilityConfig={{ itemVisiblePercentThreshold: 60 }}
-        getItemLayout={(_, index) => ({
-          length: width * PAGE_RATIO,
-          offset: width * PAGE_RATIO * index,
-          index,
-        })}
-        contentContainerStyle={styles.content}
+      <ImageReader
+        pages={pages}
+        initialIndex={currentPage}
+        mode={readerSettings.mode}
+        onPageChange={handlePageChange}
       />
 
       <ThemedView type="backgroundElement" style={styles.navBar}>
@@ -231,9 +213,6 @@ const styles = StyleSheet.create({
   },
   statusTitle: {
     flex: 1,
-  },
-  content: {
-    alignItems: 'center',
   },
   navBar: {
     flexDirection: 'row',

@@ -8,6 +8,8 @@ import { Manga } from '@/domain/models/manga';
 import { useTheme } from '@/hooks/use-theme';
 
 const COVER_RATIO = 2 / 3;
+const TITLE_LINE_HEIGHT = 20;
+const TITLE_LINES = 2;
 
 export function MangaCard({ manga, width }: { manga: Manga; width: number }) {
   const theme = useTheme();
@@ -30,7 +32,7 @@ export function MangaCard({ manga, width }: { manga: Manga; width: number }) {
           />
         ) : null}
       </View>
-      <ThemedText type="small" numberOfLines={2} style={styles.title}>
+      <ThemedText type="small" numberOfLines={TITLE_LINES} style={styles.title}>
         {manga.title}
       </ThemedText>
     </Pressable>
@@ -44,6 +46,7 @@ const styles = StyleSheet.create({
   },
   title: {
     marginTop: Spacing.one,
+    minHeight: TITLE_LINE_HEIGHT * TITLE_LINES,
   },
   pressed: {
     opacity: 0.7,

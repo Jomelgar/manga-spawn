@@ -11,7 +11,8 @@ import type {
 import type { ContentSource } from '../content-source';
 import { stripTags } from '../text';
 
-const PAGE_SIZE = 30;
+const PAGE_SIZE = 48;
+const MIN_READABLE = 16;
 
 interface CatalogItem {
   id: number;
@@ -149,25 +150,48 @@ export class MegaBananaSource implements ContentSource {
   private async catalog(
     search: string | undefined,
     offset: number,
-    limit: number,
+    _limit: number,
     category?: string,
   ): Promise<Page<Content>> {
-    const response = await this.http.get<CatalogResponse>('/wp-json/megabanana/v1/catalog', {
-      params: {
-        per_page: PAGE_SIZE,
-        page: Math.floor(offset / PAGE_SIZE) + 1,
-        search: search?.trim() || undefined,
-        category,
-      },
-    });
-    const items = response.items
-      .filter((item) => item.readerReady !== false)
-      .map(mapItem);
+    const startPage = Math.floor(offset / PAGE_SIZE) + 1;
+    const maxPages = startPage + 2;
+
+    const items: Content[] = [];
+    let consumed = 0;
+    let total = 0;
+    let lastPage = startPage;
+
+    for (let page = startPage; page <= maxPages; page += 1) {
+      const response = await this.http.get<CatalogResponse>('/wp-json/megabanana/v1/catalog', {
+        params: {
+          per_page: PAGE_SIZE,
+          page,
+          search: search?.trim() || undefined,
+          category,
+        },
+      });
+
+      total = response.total;
+      lastPage = response.pages;
+      consumed += 1;
+
+      for (const item of response.items) {
+        if (item.readerReady === false) continue;
+        items.push(mapItem(item));
+      }
+
+      if (items.length >= MIN_READABLE || page >= response.pages) break;
+    }
+
+    const alignedOffset = (startPage - 1) * PAGE_SIZE;
+    const limit = consumed * PAGE_SIZE;
+    const reachedEnd = startPage + consumed - 1 >= lastPage;
+
     return {
       items,
-      offset,
-      limit: limit || PAGE_SIZE,
-      total: response.total,
+      offset: alignedOffset,
+      limit,
+      total: reachedEnd ? alignedOffset + limit : total,
     };
   }
 
@@ -223,8 +247,8 @@ function toRelease(postId: string, chapter: ReaderChapter): Release {
   };
 }
 
-function cleanTitle(title: string): string {
-  return title
+function cleanTitle(title: string | undefined): string {
+  return (title ?? '')
     .replace(/^Leer\s+/i, '')
     .replace(/\s+Comic Online.*$/i, '')
     .trim();

@@ -15,11 +15,24 @@ const announceSchema = z.object({
 export const adminRoutes = new Hono();
 
 adminRoutes.use('*', async (c, next) => {
-  const key = c.req.header('x-admin-key');
+  const key = c.req.header('x-admin-key') ?? c.req.query('key');
   if (!config.adminApiKey || key !== config.adminApiKey) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   await next();
+});
+
+adminRoutes.get('/hello', async (c) => {
+  const devices = listEnabledDevices();
+  const sent = await sendPush(
+    devices.map((device) => ({ deviceId: device.id, token: device.expo_token })),
+    {
+      title: 'Hola 👋',
+      body: 'Saludo desde tu servidor de manga-spawn.',
+      data: { url: '/' },
+    },
+  );
+  return c.json({ ok: true, sent, devices: devices.length });
 });
 
 adminRoutes.post('/announce', async (c) => {

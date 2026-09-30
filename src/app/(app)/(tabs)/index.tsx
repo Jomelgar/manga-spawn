@@ -8,11 +8,12 @@ import { LogoMark } from '@/components/logo';
 import { MangaGrid } from '@/components/manga-grid';
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Loading } from '@/components/ui/loading';
 import { Segmented } from '@/components/ui/segmented';
 import { Spacing } from '@/constants/theme';
 import { useSession } from '@/core/auth/session-provider';
-import { flattenPages } from '@/core/utils/pages';
+import { flattenUniquePages } from '@/core/utils/pages';
 import { useInProgress } from '@/features/library/use-library';
 import { useLatestManga, usePopularManga } from '@/features/manga/use-manga';
 
@@ -33,7 +34,7 @@ export default function HomeScreen() {
   const latest = useLatestManga(kind, feed === 'latest');
 
   const active = feed === 'popular' ? popular : latest;
-  const manga = useMemo(() => flattenPages(active.data), [active.data]);
+  const manga = useMemo(() => flattenUniquePages(active.data), [active.data]);
 
   const header = (
     <View style={styles.header}>
@@ -62,10 +63,21 @@ export default function HomeScreen() {
     </View>
   );
 
+  if (active.isError) {
+    return (
+      <Screen>
+        <EmptyState
+          title="No se pudo cargar"
+          message={active.error instanceof Error ? active.error.message : 'Intenta más tarde.'}
+        />
+      </Screen>
+    );
+  }
+
   if (!active.data && active.isFetching) {
     return (
       <Screen>
-        <Loading message="Cargando mangas…" />
+        <Loading message="Cargando…" />
       </Screen>
     );
   }

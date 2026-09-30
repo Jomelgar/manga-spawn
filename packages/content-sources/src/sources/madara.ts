@@ -162,19 +162,17 @@ function toContent(slug: string, title: string, coverUrl: string | null): Conten
 export function parseListing(html: string): Content[] {
   const results: Content[] = [];
   const seen = new Set<string>();
-  const blocks = html.split('data-post-id="');
+  const pattern = /<a\s+href="[^"]*\/comic\/([^/"]+)\/[^"]*"[^>]*title="([^"]*)"/g;
 
-  for (const block of blocks.slice(1)) {
-    const anchor = block.match(
-      /<a\s+href="[^"]*\/comic\/([^/"]+)\/([^/"]*)\/?"[^>]*title="([^"]*)"/,
-    );
-    if (!anchor) continue;
-    const slug = anchor[1];
-    if (seen.has(slug)) continue;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(html)) !== null) {
+    const slug = match[1];
+    if (slug === 'feed' || slug === 'page' || seen.has(slug)) continue;
     seen.add(slug);
 
-    const cover = block.match(/data-src="([^"]+)"/);
-    results.push(toContent(slug, decodeEntities(anchor[3]) || humanize(slug), cover ? cover[1] : null));
+    const window = html.slice(match.index, match.index + 1200);
+    const cover = window.match(/data-src="([^"]+)"/);
+    results.push(toContent(slug, decodeEntities(match[2]) || humanize(slug), cover ? cover[1] : null));
   }
 
   return results;

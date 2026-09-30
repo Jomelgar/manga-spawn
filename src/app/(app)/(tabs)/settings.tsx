@@ -227,6 +227,16 @@ function ServerSyncSection() {
             loading={sync.isPending}
             onPress={() => sync.mutate()}
           />
+          {sync.isSuccess ? (
+            <ThemedText type="small" themeColor="success">
+              Sincronizado ✓ ({sync.data} título{sync.data === 1 ? '' : 's'})
+            </ThemedText>
+          ) : null}
+          {sync.isError ? (
+            <ThemedText type="small" themeColor="danger">
+              {sync.error instanceof Error ? sync.error.message : 'Error al sincronizar.'}
+            </ThemedText>
+          ) : null}
           <Button
             title="Desregistrar dispositivo"
             variant="secondary"

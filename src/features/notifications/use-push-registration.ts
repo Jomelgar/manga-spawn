@@ -1,6 +1,7 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useRepositories } from '@/core/di/provider';
+import { toServerSubscriptions } from '@/domain/services/server-subscriptions';
 
 export const pushRegistrationKeys = {
   enabled: ['push-registration', 'enabled'] as const,
@@ -22,8 +23,18 @@ export function useDeviceId() {
 }
 
 export function useSyncPushRegistration() {
-  const { pushRegistration } = useRepositories();
-  return useMutation({ mutationFn: () => pushRegistration.sync() });
+  const { pushRegistration, library } = useRepositories();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const followed = await library.listFollowed();
+      await pushRegistration.syncSubscriptions(toServerSubscriptions(followed));
+      return followed.length;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: pushRegistrationKeys.deviceId });
+    },
+  });
 }
 
 export function useUnregisterPush() {

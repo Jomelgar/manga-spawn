@@ -12,7 +12,7 @@ import { Segmented } from '@/components/ui/segmented';
 import { TextField } from '@/components/ui/text-field';
 import { TagChip } from '@/components/tag-chip';
 import { Spacing } from '@/constants/theme';
-import { flattenPages } from '@/core/utils/pages';
+import { flattenUniquePages } from '@/core/utils/pages';
 import { MangaSearchFilters } from '@/domain/models/manga';
 import { searchStore, useSearchState } from '@/features/manga/search-store';
 import { useMangaSearch, useMangaTags } from '@/features/manga/use-manga';
@@ -40,7 +40,7 @@ export default function SearchScreen() {
 
   const enabled = Boolean(query && (query.title || query.includedTags?.length));
   const search = useMangaSearch(filters, enabled, kind);
-  const results = useMemo(() => flattenPages(search.data), [search.data]);
+  const results = useMemo(() => flattenUniquePages(search.data), [search.data]);
 
   const canSearch = Boolean(title.trim()) || selectedTags.length > 0;
 
@@ -91,6 +91,18 @@ export default function SearchScreen() {
       </View>
     </View>
   );
+
+  if (search.isError) {
+    return (
+      <Screen>
+        {header}
+        <EmptyState
+          title="Error al buscar"
+          message={search.error instanceof Error ? search.error.message : 'Intenta de nuevo.'}
+        />
+      </Screen>
+    );
+  }
 
   if (search.isLoading) {
     return (

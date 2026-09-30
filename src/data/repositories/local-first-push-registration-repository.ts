@@ -51,9 +51,13 @@ export class LocalFirstPushRegistrationRepository implements PushRegistrationRep
 
     let tokenInfo = await this.notifications.getStoredToken();
     if (!tokenInfo) {
-      tokenInfo = await this.notifications.registerForPush().catch(() => null);
+      tokenInfo = await this.notifications.registerForPush();
     }
-    if (!tokenInfo) return;
+    if (!tokenInfo) {
+      throw new Error(
+        'No se pudo obtener el token push. Concede permisos de notificación e inténtalo de nuevo.',
+      );
+    }
 
     const deviceId = await this.getDeviceId();
     const device = {
@@ -73,13 +77,14 @@ export class LocalFirstPushRegistrationRepository implements PushRegistrationRep
         dirty: false,
         updatedAt: new Date().toISOString(),
       });
-    } catch {
+    } catch (error) {
       await this.writePending({
         ...pending,
         device,
         dirty: true,
         updatedAt: new Date().toISOString(),
       });
+      throw error;
     }
   }
 
